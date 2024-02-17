@@ -55,16 +55,28 @@ SELECT
  --Question2b answer: "Nurse Practitioner"	"Y"	900845
 
  --Question2c c. **Challenge Question:** Are there any specialties that appear in the prescriber table that have no associated prescriptions in the prescription table?
+ SELECT
+ 	prescriber.specialty_description,
+ 	SUM(prescription.total_claim_count)
+ FROM prescriber
+ 	LEFT JOIN prescription
+	ON prescriber.npi = prescription.npi
+ GROUP BY prescriber.specialty_description
+ 	HAVING SUM(prescription.total_claim_count) IS NULL;
+ 
  --Question2d d. **Difficult Bonus:** *Do not attempt until you have solved all other problems!* For each specialty, report the percentage of total claims by that specialty which are for opioids. Which specialties have a high percentage of opioids?
  
- --Question3a Which drug (generic_name) had the highest total drug cost?
-SELECT drug.generic_name,
- SUM(prescription.total_drug_cost)
- FROM prescription
- 	INNER JOIN drug
-	ON prescription.drug_name = drug.drug_name
-GROUP BY drug.generic_name
-ORDER BY SUM(prescription.total_drug_cost) DESC;
+ WITH opioid_claims AS (
+ 	SELECT SUM(prescription.total_claim_count) AS opioid_total_claim
+					FROM prescription
+		 			INNER JOIN drug
+		 				ON prescription.drug_name = drug.drug_name
+		 			INNER JOIN prescriber
+		 				ON prescription.npi = prescriber.npi
+					WHERE drug.opioid_drug_flag = 'Y'
+				GROUP BY prescriber.specialty_description)-- CTE for total opioid claims
+claims AS 
+S
 
 --Question3a answer "INSULIN GLARGINE,HUM.REC.ANLOG"	104264066.35
 
@@ -144,13 +156,30 @@ WHERE total_claim_count >= 3000;
 --"MIRTAZAPINE"	3085
 
 --Question6b  For each instance that you found in part a, add a column that indicates whether the drug is an opioid.
-SELECT drug_name, opioid_drug_flag
-	total_claim_count
+SELECT drug.drug_name, 
+	prescription.total_claim_count, drug.
+	opioid_drug_flag
 FROM prescription
 	INNER JOIN drug
 	ON prescription.drug_name = drug.drug_name
-	CASE WHEN drug.opioid_drug_flag = 'Y')
 WHERE total_claim_count >= 3000;
+
+--Question6b answer ^
+
+--Question6c Add another column to you answer from the previous part which gives the prescriber first and last name associated with each row
+SELECT drug.drug_name, 
+	prescription.total_claim_count, 
+	drug.opioid_drug_flag,
+	prescriber.nppes_provider_first_name,
+	prescriber.nppes_provider_last_org_name
+FROM prescription
+	INNER JOIN drug
+	ON prescription.drug_name = drug.drug_name
+INNER JOIN prescriber
+	ON prescription.npi = prescriber.npi
+WHERE total_claim_count >= 3000;
+
+--Question6c answer ^
 
 --Question7a First, create a list of all npi/drug_name combinations for pain management specialists (specialty_description = 'Pain Management) in the city of Nashville (nppes_provider_city = 'NASHVILLE'), where the drug is an opioid (opiod_drug_flag = 'Y').
 SELECT drug.drug_name, prescriber.npi
@@ -165,7 +194,10 @@ WHERE prescriber.specialty_description ilike 'pain management'
 --Question7b Next, report the number of claims per drug per prescriber
 SELECT prescriber.npi,
 	drug.drug_name,
-	SUM(prescription.total_claim_count)
+		(SELECT SUM(prescription.total_claim_count)
+		 FROM prescription
+		 WHERE prescription.npi = prescriber.npi
+		 	AND prescription.drug_name = drug.drug_name) AS total_per_drug_per_prescriber
 FROM prescriber
 CROSS JOIN drug
 LEFT JOIN prescription
@@ -174,13 +206,18 @@ WHERE prescriber.specialty_description ilike 'pain management'
 	AND prescriber.nppes_provider_city ilike 'nashville'
 	AND drug.opioid_drug_flag = 'Y'
 GROUP BY drug.drug_name,prescriber.npi
+ORDER BY prescriber.npi;
 
 --Question7b answer^
 
 --Question7c Finally, if you have not done so already, fill in any missing values for total_claim_count with 0
 SELECT prescriber.npi,
 	drug.drug_name,
-	COALESCE(SUM(prescription.total_claim_count),0)
+		(SELECT(COALESCE(SUM(prescription.total_claim_count),0))
+		FROM prescription
+		 WHERE prescription.npi = prescriber.npi
+		 	AND prescription.drug_name = drug.drug_name)
+			AS total_per_drug_per_prescriber
 FROM prescriber
 CROSS JOIN drug
 LEFT JOIN prescription
@@ -189,5 +226,6 @@ WHERE prescriber.specialty_description ilike 'pain management'
 	AND prescriber.nppes_provider_city ilike 'nashville'
 	AND drug.opioid_drug_flag = 'Y'
 GROUP BY drug.drug_name,prescriber.npi
+ORDER BY drug.drug_name;
 
 --Question7c ^
